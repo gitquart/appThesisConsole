@@ -42,7 +42,7 @@ lim_bot_fijo=159803
 thesis_added=False
 
 chromedriver_autoinstaller.install()
-browser=webdriver.Chrome()
+
 
 
 """
@@ -57,7 +57,7 @@ def readUrl(op,sense,l_bot,l_top):
     #Can use noTesis as test variable too
     noTesis=0
     strField=''
-    
+    browser=webdriver.Chrome()
     #Import JSON file
     print('Starting process...')
     print('Only uploaded thesis will appear...')
@@ -237,10 +237,7 @@ def mongoDBProcess(json_thesis):
     
     strID=json_thesis['ID']
     strHeading=json_thesis['content']['heading']
-    
-    
-    
-    
+  
     result=collection.count_documents(
                            {'ID':strID,
                             'content.heading':strHeading}
@@ -253,7 +250,38 @@ def mongoDBProcess(json_thesis):
        
        
     return thesis_added 
-        
+
+"""
+update Rows can be an isolated program only to update data, it is in testing phase now
+"""
+def updateRows():
+    #Connect to Cassandra
+    objCC=CassandraConnection()
+    cloud_config= {
+        'secure_connect_bundle': pathToHere+'secure-connect-dbquart.zip'
+    }
+    
+    auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
+    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
+    session = cluster.connect()
+    session.default_timeout=1000
+    session.default_fetch_size=500
+    
+    row=''
+    querySt="select * from thesis.tbthesis limit 10"
+    future = session.execute_async(querySt)
+    res=future.result()
+            
+    if res:
+        for row in res:
+            #Period is index 7, ID is index 0 (cassandra)
+            #It is necessary to create another field like "no_period" for this task
+            print('Period:',str(row[7]))
+            print('ID',str(row[0]))
+     
+    #Shut down cluster
+    cluster.shutdown()
+            
 
 """
 uploadThesis:

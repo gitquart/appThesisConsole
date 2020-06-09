@@ -8,14 +8,13 @@ Useful conversions
 
 """
 
-import asyncio
-
 from readAndUploadThesis import readUrl
 from readAndUploadThesis import checkRows
 from readAndUploadThesis import checkRowsInReal
+from readAndUploadThesis import updateRows
 
 print('Main program of Quart')
-print('Want to know the total of rows? 1.Yes 2. No')
+print('Want to know the total of rows? 1.Yes, 2. No, 3.Update Rows')
 query=input()
 intquery=int(query)
 
@@ -30,7 +29,7 @@ if(intquery==2):
     toplim=input()
     inttop=int(toplim)
     res=readUrl(2,intsense,intlow,inttop)
-else:
+if(intquery==1):
     print('Do you want to read tbthesis or tbthesis per period? 1 OR 2 respect...')
     query=input()
     intquery=int(query)
@@ -38,6 +37,8 @@ else:
         checkRowsInReal()
     else:       
 	    checkRows()
+if(intquery==3):
+    updateRows()     
  
   
 print("Main program is done")
