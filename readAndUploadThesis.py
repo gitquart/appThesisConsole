@@ -31,7 +31,7 @@ from cassandra.auth import PlainTextAuthProvider
 #Global variables
 
 
-pathToHere='/Users/ulysesrico/RespaldoMacUly/quart/quartThesisDB/'
+pathToHere='/Users/ulysesrico/RespaldoMacUly/quart/appsQuart/appConsoleThesis/'
 dirquarttest=pathToHere+'filetest/'
 msg_error="Custom Error"
 thesis_id=[ 'lblTesisBD','lblInstancia','lblFuente','lblLocMesAño','lblEpoca','lblLocPagina','lblTJ','lblRubro','lblTexto','lblPrecedentes']
@@ -118,23 +118,41 @@ def checkRows():
     session.default_timeout=1000
     session.default_fetch_size=500
     
-
-    print('Hang on...getting rows...')
-    
     querySt="select no_thesis from thesis.tbthesis_per_period where id_period=10"
-    
     row = session.execute(querySt)
+    print('Hang on...getting rows...')
 
     if row:
         print('Thesis so far in period 10:',row[0][0])
        
+    print('Total rows for 10th:',str(count))  
+    
+ def checkRowsInReal():
+        #Connect to Cassandra
+    objCC=CassandraConnection()
+    cloud_config= {
+        'secure_connect_bundle': pathToHere+'secure-connect-dbquart.zip'
+    }
+    
+    auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
+    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
+    session = cluster.connect()
+    session.default_timeout=1000
+    session.default_fetch_size=500
+    
+    querySt="select id_thesis from thesis.tbthesis where period='Décima Época'"
+    
+    row = session.execute(querySt)
+    print('Hang on...getting rows...')
+
+    count=0
+    if row:
+        for r in row:
+            count=count+1
+     
+    print('Total rows for 10th:',str(count))            
 
          
-
-        
-
-
-
 def cassandraBDProcess(json_thesis):
     
     global thesis_added
