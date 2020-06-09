@@ -12,6 +12,7 @@ import asyncio
 
 from readAndUploadThesis import readUrl
 from readAndUploadThesis import checkRows
+from readAndUploadThesis import checkRowsInReal
 
 print('Main program of Quart')
 print('Want to know the total of rows? 1.Yes 2. No')
@@ -30,7 +31,13 @@ if(intquery==2):
     inttop=int(toplim)
     res=readUrl(2,intsense,intlow,inttop)
 else:
-	checkRows()
+    print('Do you want to read tbthesis or tbthesis per period? 1 OR 2 respect...')
+    query=input()
+    intquery=int(query)
+    if (intquery==1):
+        checkRowsInReal()
+    else:       
+	    checkRows()
  
   
 print("Main program is done")

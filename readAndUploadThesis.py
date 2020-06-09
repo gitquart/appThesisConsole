@@ -127,8 +127,8 @@ def checkRows():
        
     print('Total rows for 10th:',str(count))  
     
- def checkRowsInReal():
-        #Connect to Cassandra
+def checkRowsInReal():
+    #Connect to Cassandra
     objCC=CassandraConnection()
     cloud_config= {
         'secure_connect_bundle': pathToHere+'secure-connect-dbquart.zip'
@@ -140,7 +140,7 @@ def checkRows():
     session.default_timeout=1000
     session.default_fetch_size=500
     
-    querySt="select id_thesis from thesis.tbthesis where period='Décima Época'"
+    querySt="select id_thesis from thesis.tbthesis where period='Novena Época'"
     
     row = session.execute(querySt)
     print('Hang on...getting rows...')
@@ -150,7 +150,7 @@ def checkRows():
         for r in row:
             count=count+1
      
-    print('Total rows for 10th:',str(count))            
+    print('Total rows :',str(count))            
 
          
 def cassandraBDProcess(json_thesis):
