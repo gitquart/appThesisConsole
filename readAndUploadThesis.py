@@ -5,7 +5,7 @@ Created on Tue May 12 13:13:25 2020
 
 @author: quart
 
-Important data to develop the code:
+Importat data to develop the code:
 
 -Link to get thesis of any period ( ID changes only):     
 https://sjf.scjn.gob.mx/SJFSist/Paginas/DetalleGeneralV2.aspx?ID=#&Clase=DetalleTesisBL&Semanario=0
@@ -42,7 +42,7 @@ lim_bot_fijo=159803
 thesis_added=False
 
 chromedriver_autoinstaller.install()
-
+browser=webdriver.Chrome()
 
 
 """
@@ -57,7 +57,7 @@ def readUrl(op,sense,l_bot,l_top):
     #Can use noTesis as test variable too
     noTesis=0
     strField=''
-    browser=webdriver.Chrome()
+    
     #Import JSON file
     print('Starting process...')
     print('Only uploaded thesis will appear...')
@@ -79,7 +79,7 @@ def readUrl(op,sense,l_bot,l_top):
                 if op==1:
                     thesis_added=mongoDBProcess(res)
                 if op==2:
-                    thesis_added=cassandraBDProcess(res)  
+                    thesis_added=cassandraBDProcess(1,res)  
                 if thesis_added==True:
                     noTesis=noTesis+1
                     print('Thesis ready: ',noTesis, "-ID: ",x)
@@ -104,58 +104,11 @@ def readUrl(op,sense,l_bot,l_top):
     browser.quit()  
     
     return 'It is all done'
-    
-def checkRows():
-    #Connect to Cassandra
-    objCC=CassandraConnection()
-    cloud_config= {
-        'secure_connect_bundle': pathToHere+'secure-connect-dbquart.zip'
-    }
-    
-    auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
-    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
-    session = cluster.connect()
-    session.default_timeout=1000
-    session.default_fetch_size=500
-    
-    querySt="select no_thesis from thesis.tbthesis_per_period where id_period=10"
-    row = session.execute(querySt)
-    print('Hang on...getting rows...')
-
-    if row:
-        print('Thesis so far in period 10:',row[0][0])
-       
-    print('Total rows for 10th:',str(count))  
-    
-def checkRowsInReal():
-    #Connect to Cassandra
-    objCC=CassandraConnection()
-    cloud_config= {
-        'secure_connect_bundle': pathToHere+'secure-connect-dbquart.zip'
-    }
-    
-    auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
-    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
-    session = cluster.connect()
-    session.default_timeout=1000
-    session.default_fetch_size=500
-    
-    querySt="select id_thesis from thesis.tbthesis where period='Novena Época'"
-    
-    row = session.execute(querySt)
-    print('Hang on...getting rows...')
-
-    count=0
-    if row:
-        for r in row:
-            count=count+1
-     
-    print('Total rows :',str(count))            
-
-         
-def cassandraBDProcess(json_thesis):
+              
+def cassandraBDProcess(op,json_thesis):
     
     global thesis_added
+    global row
 
     #Connect to Cassandra
     objCC=CassandraConnection()
@@ -169,49 +122,87 @@ def cassandraBDProcess(json_thesis):
     session.default_timeout=50
     
     
-    #Get values for query
-    #Ejemplo : Décima Época
-
-    period=json_thesis['period']
-    period=period.lower()
+    if op==1:
+        
+        #Get values for query
+        #Ejemplo : Décima Época
+        period=json_thesis['period']
+        period=period.lower()
     
-    if period=='décima época':
-        idThesis=json_thesis['id_thesis']
-        heading=json_thesis['heading']
-        #Check wheter or not the record exists
-        querySt="select * from thesis.tbthesis where id_thesis="+str(idThesis)+" and heading='"+heading+"'"
-    
-        future = session.execute_async(querySt)
-        row=future.result()
-
-
-
-        if row: 
-            thesis_added=False
-        else:
-            #Insert Data as JSON
-            json_thesis=json.dumps(json_thesis)
-            #wf.appendInfoToFile(dirquarttest,str(idThesis)+'.json', json_thesis)
-            insertSt="INSERT INTO thesis.tbthesis JSON '"+json_thesis+"';"
-            future = session.execute_async(insertSt)
-            future.result() 
-
-            #Update count for table
+        if period=='novena época':
             row=''
-            querySt="select no_thesis from thesis.tbthesis_per_period where id_period=10"
+            idThesis=json_thesis['id_thesis']
+            heading=json_thesis['heading']
+            #Check wheter or not the record exists
+            querySt="select * from thesis.tbthesis where id_thesis="+str(idThesis)+" and heading='"+heading+"'"
+    
             future = session.execute_async(querySt)
             row=future.result()
-            
-            if row:
-                total=int(row[0][0])+1
-                updateSt="update thesis.tbthesis_per_period set no_thesis="+str(total)+" where id_period=10 "
-                future=session.execute_async(updateSt)
+        
+            if row: 
+                thesis_added=False
+            else:
+                #Insert Data as JSON
+                json_thesis=json.dumps(json_thesis)
+                #wf.appendInfoToFile(dirquarttest,str(idThesis)+'.json', json_thesis)
+                insertSt="INSERT INTO thesis.tbthesis JSON '"+json_thesis+"';"
+                future = session.execute_async(insertSt)
                 future.result() 
 
-            thesis_added=True
-    
+                #Update count for table
+                row=''
+                querySt="select no_thesis from thesis.tbthesis_per_period where id_period=10"
+                future = session.execute_async(querySt)
+                row=future.result()
+            
+                if row:
+                    total=int(row[0][0])+1
+                    updateSt="update thesis.tbthesis_per_period set no_thesis="+str(total)+" where id_period=10 "
+                    future=session.execute_async(updateSt)
+                    future.result() 
 
-    cluster.shutdown()          
+                thesis_added=True
+    
+    if op==2:
+        row=''
+        print('Check rows in thesis per period table...')
+        querySt="select no_thesis from thesis.tbthesis_per_period where id_period=10"
+        row = session.execute(querySt)
+        print('Hang on...getting rows...')
+
+        if row:
+            print('Thesis so far in period 10:',row[0][0])
+       
+        print('Total rows for 10th:',str(count))
+    
+    if op==3:
+        row=''
+        print('Counting rows from main table tbthesis...')
+        querySt="select id_thesis from thesis.tbthesis where period='Novena Época'" 
+        row = session.execute(querySt)
+        print('Hang on...getting rows...')
+        count=0
+        if row:
+            for r in row:
+                count=count+1
+     
+        print('Total rows :',str(count)) 
+    
+    if op==4:
+        row=''
+        querySt="select * from thesis.tbthesis limit 10"
+        future = session.execute_async(querySt)
+        res=future.result()
+            
+        if res:
+            for row in res:
+                #Period is index 7, ID is index 0 (cassandra)
+                #It is necessary to create another field like "no_period" for this task
+                print('Period:',str(row[7]))
+                print('ID',str(row[0]))
+
+    cluster.shutdown()
+              
     return thesis_added
  
 
@@ -251,36 +242,7 @@ def mongoDBProcess(json_thesis):
        
     return thesis_added 
 
-"""
-update Rows can be an isolated program only to update data, it is in testing phase now
-"""
-def updateRows():
-    #Connect to Cassandra
-    objCC=CassandraConnection()
-    cloud_config= {
-        'secure_connect_bundle': pathToHere+'secure-connect-dbquart.zip'
-    }
-    
-    auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
-    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
-    session = cluster.connect()
-    session.default_timeout=1000
-    session.default_fetch_size=500
-    
-    row=''
-    querySt="select * from thesis.tbthesis limit 10"
-    future = session.execute_async(querySt)
-    res=future.result()
-            
-    if res:
-        for row in res:
-            #Period is index 7, ID is index 0 (cassandra)
-            #It is necessary to create another field like "no_period" for this task
-            print('Period:',str(row[7]))
-            print('ID',str(row[0]))
-     
-    #Shut down cluster
-    cluster.shutdown()
+
             
 
 """
@@ -370,6 +332,7 @@ def uploadThesis(id_thesis,json_thesis):
         thesis_html=''
         result=json_thesis
     else:
+        print('Nope:',strIdThesis)
         result=''
         
     return  result
