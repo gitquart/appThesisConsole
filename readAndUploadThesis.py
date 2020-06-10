@@ -51,7 +51,7 @@ readUrl
 Reads the url from the jury web site
 """
 
-def readUrl(op,sense,l_bot,l_top):
+def readUrl(sense,l_bot,l_top):
     
     res=''
     #Can use noTesis as test variable too
@@ -60,7 +60,6 @@ def readUrl(op,sense,l_bot,l_top):
     
     #Import JSON file
     print('Starting process...')
-    print('Only uploaded thesis will appear...')
     
     if l_top==0:
         l_top=lim_top_fijo
@@ -75,11 +74,7 @@ def readUrl(op,sense,l_bot,l_top):
         for x in range(l_bot,l_top):
             res=uploadThesis(x,json_thesis)
             if(res!=''):
-                #Upload thsis to MongoDB
-                if op==1:
-                    thesis_added=mongoDBProcess(res)
-                if op==2:
-                    thesis_added=cassandraBDProcess(1,res)  
+                thesis_added=cassandraBDProcess(1,res)  
                 if thesis_added==True:
                     noTesis=noTesis+1
                     print('Thesis ready: ',noTesis, "-ID: ",x)
@@ -90,10 +85,8 @@ def readUrl(op,sense,l_bot,l_top):
         for x in range(l_top,l_bot,-1):
             res=uploadThesis(x,json_thesis)
             if(res!=''):
-                #Upload thsis to MongoDB
+                #Upload thsis to MongoDB 
                 if op==1:
-                    thesis_added=mongoDBProcess(res)
-                if op==2:
                     thesis_added=cassandraBDProcess(res)  
                 if thesis_added==True:
                     noTesis=noTesis+1
@@ -207,43 +200,8 @@ def cassandraBDProcess(op,json_thesis):
  
 
 
-"""
-mongoDBProcess:
-    Inserts a document (thesis) in database, this method inserts a new thesis only
-    if this doesn´t exist
-
-"""
-def mongoDBProcess(json_thesis):
-    
-    objMC=MongoConnection()
-    user=objMC.mc_user
-    pwd=objMC.mc_pwd
-    cluster=objMC.mc_.cluster
-    global thesis_added
-    result=''
-    client = MongoClient("mongodb+srv://"+user+":"+pwd+"@"+cluster+"-mlo2r.azure.mongodb.net/test?retryWrites=true&w=majority")
-    db = client['dbquart']
-    collection=db['all_thesis']
-    #Check if the thesis exists
-    
-    strID=json_thesis['ID']
-    strHeading=json_thesis['content']['heading']
-  
-    result=collection.count_documents(
-                           {'ID':strID,
-                            'content.heading':strHeading}
-                           )
-       
-    
-    if result==0:
-       collection.insert_one(json_thesis)
-       thesis_added=True
-       
-       
-    return thesis_added 
 
 
-            
 
 """
 uploadThesis:
@@ -332,7 +290,7 @@ def uploadThesis(id_thesis,json_thesis):
         thesis_html=''
         result=json_thesis
     else:
-        print('Nope:',strIdThesis)
+        print('Custom error ID:',strIdThesis)
         result=''
         
     return  result
@@ -343,10 +301,6 @@ Objecst to connect to DB
 
 """
 
-class MongoConnection():
-    mc_user='admin'
-    mc_pwd='v9mIadQx6dWjVDZc'
-    mc_cluster='clustertest'
     
 class CassandraConnection():
     cc_user='quartadmin'
@@ -355,4 +309,47 @@ class CassandraConnection():
     cc_databaseID='9de16523-0e36-4ff0-b388-44e8d0b1581f'
         
 
+#The following code is not used but it can be useful some day
 
+"""
+mongoDBProcess:
+    Inserts a document (thesis) in database, this method inserts a new thesis only
+    if this doesn´t exist
+
+
+def mongoDBProcess(json_thesis):
+    
+    objMC=MongoConnection()
+    user=objMC.mc_user
+    pwd=objMC.mc_pwd
+    cluster=objMC.mc_.cluster
+    global thesis_added
+    result=''
+    client = MongoClient("mongodb+srv://"+user+":"+pwd+"@"+cluster+"-mlo2r.azure.mongodb.net/test?retryWrites=true&w=majority")
+    db = client['dbquart']
+    collection=db['all_thesis']
+    #Check if the thesis exists
+    
+    strID=json_thesis['ID']
+    strHeading=json_thesis['content']['heading']
+  
+    result=collection.count_documents(
+                           {'ID':strID,
+                            'content.heading':strHeading}
+                           )
+       
+    
+    if result==0:
+       collection.insert_one(json_thesis)
+       thesis_added=True
+       
+       
+    return thesis_added 
+"""    
+
+"""
+class MongoConnection():
+    mc_user='admin'
+    mc_pwd='v9mIadQx6dWjVDZc'
+    mc_cluster='clustertest'
+"""

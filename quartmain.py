@@ -28,7 +28,7 @@ if(intquery==1):
     print('Write Top limit -Zero if you do not know-')
     toplim=input()
     inttop=int(toplim)
-    res=readUrl(2,intsense,intlow,inttop)
+    res=readUrl(intsense,intlow,inttop)
 else:
     cassandraBDProcess(intquery,'')
 
