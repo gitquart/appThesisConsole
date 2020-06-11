@@ -11,7 +11,7 @@ Importat data to develop the code:
 https://sjf.scjn.gob.mx/SJFSist/Paginas/DetalleGeneralV2.aspx?ID=#&Clase=DetalleTesisBL&Semanario=0
 
 -10th period , last thesis found 1531. Registro No. 2 021 804
-- 2,100,000 seems to be a nice limit to look for thesis
+- 2,021,819 seems to be a nice limit to look for thesis
 
 
 """
@@ -85,9 +85,8 @@ def readUrl(sense,l_bot,l_top):
         for x in range(l_top,l_bot,-1):
             res=uploadThesis(x,json_thesis)
             if(res!=''):
-                #Upload thsis to MongoDB 
-                if op==1:
-                    thesis_added=cassandraBDProcess(res)  
+                #Upload thsis to Cassandra 
+                thesis_added=cassandraBDProcess(1,res)  
                 if thesis_added==True:
                     noTesis=noTesis+1
                     print('Thesis ready: ',noTesis, "-ID: ",x)
