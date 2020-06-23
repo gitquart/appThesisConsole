@@ -27,6 +27,9 @@ import time
 #import bson
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
+#import writeFile as wf
+import requests 
+from cassandra.query import SimpleStatement
 
 #Global variables
 
@@ -37,6 +40,7 @@ msg_error="Custom Error"
 thesis_id=[ 'lblTesisBD','lblInstancia','lblFuente','lblLocMesAño','lblEpoca','lblLocPagina','lblTJ','lblRubro','lblTexto','lblPrecedentes']
 thesis_class=['publicacion']
 precedentes_list=['francesa','nota']
+ls_months=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
 lim_top_fijo=2021819
 lim_bot_fijo=159803
 thesis_added=False
@@ -51,7 +55,7 @@ readUrl
 Reads the url from the jury web site
 """
 
-def readUrl(sense,l_bot,l_top):
+def readUrl(sense,l_bot,l_top,period):
     
     res=''
     #Can use noTesis as test variable too
@@ -72,32 +76,36 @@ def readUrl(sense,l_bot,l_top):
     #Onwars for    
     if(sense==1):
         for x in range(l_bot,l_top):
-            res=uploadThesis(x,json_thesis)
+            res=prepareThesis(x,json_thesis,period)
+            #wf.appendInfoToFile(pathToHere+'tests/',str(x)+'.json',json.dumps(json_thesis))
             if(res!=''):
-                thesis_added=cassandraBDProcess(1,res)  
+                thesis_added=cassandraBDProcess(1,res,period) 
+                #thesis_added=True 
                 if thesis_added==True:
                     noTesis=noTesis+1
                     print('Thesis ready: ',noTesis, "-ID: ",x)
                     #if noTesis==3:
-                     #   break
+                    #   break
     #Backwards For             
     if(sense==2):
-        for x in range(l_top,l_bot,-1):
-            res=uploadThesis(x,json_thesis)
+        for x in range(l_top,l_bot,-1): 
+            res=prepareThesis(x,json_thesis,period)
+            #wf.appendInfoToFile(pathToHere+'tests/',str(x)+'.json',json.dumps(json_thesis))
             if(res!=''):
                 #Upload thsis to Cassandra 
-                thesis_added=cassandraBDProcess(1,res)  
+                thesis_added=cassandraBDProcess(1,res,period) 
+                #thesis_added=True 
                 if thesis_added==True:
                     noTesis=noTesis+1
                     print('Thesis ready: ',noTesis, "-ID: ",x)
                     #if noTesis==3:
-                     #   break 
+                    #    break 
                                    
     browser.quit()  
     
     return 'It is all done'
               
-def cassandraBDProcess(op,json_thesis):
+def cassandraBDProcess(op,json_thesis,period_num):
     
     global thesis_added
     global row
@@ -110,8 +118,15 @@ def cassandraBDProcess(op,json_thesis):
     
     auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
     cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
+    
     session = cluster.connect()
-    session.default_timeout=50
+    session.default_timeout=15
+    
+    
+    if period_num==9:
+        strperiod='Novena Época'
+    if period_num==10:
+        strperiod='Décima Época'    
     
     
     if op==1:
@@ -121,13 +136,16 @@ def cassandraBDProcess(op,json_thesis):
         period=json_thesis['period']
         period=period.lower()
     
-        if period=='novena época':
+    
+        if period==strperiod.lower():
+            
             row=''
             idThesis=json_thesis['id_thesis']
             heading=json_thesis['heading']
             #Check wheter or not the record exists
+           
             querySt="select * from thesis.tbthesis where id_thesis="+str(idThesis)+" and heading='"+heading+"'"
-    
+                
             future = session.execute_async(querySt)
             row=future.result()
         
@@ -137,154 +155,169 @@ def cassandraBDProcess(op,json_thesis):
                 #Insert Data as JSON
                 json_thesis=json.dumps(json_thesis)
                 #wf.appendInfoToFile(dirquarttest,str(idThesis)+'.json', json_thesis)
-                insertSt="INSERT INTO thesis.tbthesis JSON '"+json_thesis+"';"
+                
+                   
+                insertSt="INSERT INTO thesis.tbthesis JSON '"+json_thesis+"';"        
                 future = session.execute_async(insertSt)
                 future.result() 
 
-                #Update count for table
-                row=''
-                querySt="select no_thesis from thesis.tbthesis_per_period where id_period=10"
-                future = session.execute_async(querySt)
-                row=future.result()
-            
-                if row:
-                    total=int(row[0][0])+1
-                    updateSt="update thesis.tbthesis_per_period set no_thesis="+str(total)+" where id_period=10 "
-                    future=session.execute_async(updateSt)
-                    future.result() 
-
                 thesis_added=True
     
-    if op==2:
-        row=''
-        print('Check rows in thesis per period table...')
-        querySt="select no_thesis from thesis.tbthesis_per_period where id_period=10"
-        row = session.execute(querySt)
-        print('Hang on...getting rows...')
-
-        if row:
-            print('Thesis so far in period 10:',row[0][0])
-       
-        print('Total rows for 10th:',str(count))
-    
     if op==3:
+        
         row=''
         print('Counting rows from main table tbthesis...')
-        querySt="select id_thesis from thesis.tbthesis where period='Novena Época'" 
-        row = session.execute(querySt)
-        print('Hang on...getting rows...')
+       
+        querySt="select id_thesis from thesis.tbthesis where period_number="+str(period_num)+" "   
+        
         count=0
-        if row:
-            for r in row:
-                count=count+1
-     
-        print('Total rows :',str(count)) 
+        statement = SimpleStatement(querySt, fetch_size=1000)
+        for row in session.execute(statement):
+            count=count+1
+        
+        print('Count',str(count))    
+            
     
     if op==4:
+        
         row=''
-        querySt="select * from thesis.tbthesis limit 10"
+        count=0
+        print('Deleting...')
+        querySt="select id_thesis from thesis.tbthesis where period_number="+str(period_num)+"" 
+        row = session.execute(querySt)
+        if row:
+            for r in row:
+                strId=str(r[0])
+                deleteSt='delete from thesis.tbthesis where id_thesis='+strId+''
+                count=count+1
+                session.execute(deleteSt)
+                
+        print('Deleted:',str(count))        
+                
+    if op==5:
+        print('Updating started...')
+        querySt="select id_thesis from thesis.tbthesis where period='Décima Época'"
         future = session.execute_async(querySt)
-        res=future.result()
-            
+        res= future.result();
+        count=0
         if res:
             for row in res:
-                #Period is index 7, ID is index 0 (cassandra)
-                #It is necessary to create another field like "no_period" for this task
-                print('Period:',str(row[7]))
-                print('ID',str(row[0]))
+                print('Hang on...')
+                idThesis=row[0]                
+                updateSt="update thesis.tbthesis set period_number=10  where id_thesis="+str(idThesis)+""
+                future = session.execute_async(updateSt)
+                res= future.result();    
+                print(idThesis,': updated')
+                count=count+1
+            
+                            
+        print('Total of thesis updated:',count)            
+            
+    
 
     cluster.shutdown()
               
     return thesis_added
  
 
-
-
-
-
 """
-uploadThesis:
+prepareThesis:
     Reads the url where the service is fetching data from thesis
 """
 
-def uploadThesis(id_thesis,json_thesis): 
+def prepareThesis(id_thesis,json_thesis,period): 
 
+    if period==9:
+        strperiod='Novena Época'
+    if period==10:
+        strperiod='Décima Época'
+        
     result=''
     strIdThesis=str(id_thesis) 
     url="https://sjf.scjn.gob.mx/SJFSist/Paginas/DetalleGeneralV2.aspx?ID="+strIdThesis+"&Clase=DetalleTesisBL&Semanario=0"
-    browser.get(url)
-    time.sleep(1)
-    thesis_html = BeautifulSoup(browser.page_source, 'lxml')
-    title=thesis_html.find('title')
-    title_text=title.text
-    if title_text.strip() != msg_error: 
-        
-        json_thesis['id_thesis']=int(strIdThesis)
-        #json_thesis['_id']=t =bson.objectid.ObjectId()
-        #Fet values from header, and body of thesis
-        for obj in thesis_id:  
-            field=thesis_html.find(id=obj)
-            if field.text != '':   
-                strField=field.text.strip()
-                if obj==thesis_id[0]:
-                    json_thesis['thesis_number']=strField
-                if obj==thesis_id[1]:
-                    json_thesis['instance']=strField
-                if obj==thesis_id[2]:
-                    json_thesis['source']=strField
-                #Special Case    
-                if obj==thesis_id[3]:
-                    if strField.find(',')!=-1:
-                        chunks=strField.split(',')
+    response= requests.get(url)
+    status= response.status_code
+    if status==200:
+        browser.get(url)
+        time.sleep(1)
+        thesis_html = BeautifulSoup(browser.page_source, 'lxml')
+        title=thesis_html.find('title')
+        title_text=title.text
+        if title_text.strip() != msg_error:  
+            json_thesis['id_thesis']=int(strIdThesis)
+            json_thesis['lst_precedents'].clear()
+            #json_thesis['_id']=t =bson.objectid.ObjectId()
+            #Fet values from header, and body of thesis
+            for obj in thesis_id:  
+                field=thesis_html.find(id=obj)
+                if field.text != '':   
+                    strField=field.text.strip()
+                    if obj==thesis_id[0]:
+                        json_thesis['thesis_number']=strField
+                    if obj==thesis_id[1]:
+                        json_thesis['instance']=strField
+                    if obj==thesis_id[2]:
+                        json_thesis['source']=strField
+                    #Special Case    
+                    if obj==thesis_id[3]:
+                        if strField.find(',')!=-1:
+                            chunks=strField.split(',')
+                            count=len(chunks)
+                            if count==2:
+                                json_thesis['book_number']=chunks[0]
+                            if count==3:
+                                json_thesis['book_number']=chunks[0]+" "+chunks[2]
+                            json_thesis['publication_date']=chunks[1]            
+                        else:
+                            json_thesis['publication_date']=strField
+                        epoc=thesis_html.find(id='lblEpoca')
+                        strEpoc=epoc.text
+                        if strEpoc==strperiod:
+                            json_thesis['dt_publication_date']=getCompleteDate(json_thesis['publication_date'])
+                    if obj==thesis_id[4]:
+                        json_thesis['period']=strField
+                        if strField=='Novena Época':
+                            json_thesis['period_number']=9
+                        if strField=='Décima Época':
+                            json_thesis['period_number']=10    
+                    if obj==thesis_id[5]:
+                        json_thesis['page']=strField
+                    #Special case :
+                    #Type of jurispricende: pattern => (Type of thesis () )
+                    if obj==thesis_id[6]:
+                        strField=strField.replace(')','')
+                        chunks=strField.split('(')
                         count=len(chunks)
-                        if count==2:
-                            json_thesis['book_number']=chunks[0]
-                            json_thesis['publication_date']=chunks[1]
-                        if count==3:
-                            json_thesis['book_number']=chunks[0]+" "+chunks[2]
-                            json_thesis['publication_date']=chunks[1]
-                    else:
-                        json_thesis['publication_date']=strField
-                if obj==thesis_id[4]:
-                    json_thesis['period']=strField
-                if obj==thesis_id[5]:
-                    json_thesis['page']=strField
-                #Special case :
-                #Type of jurispricende (Type of thesis () )
-                if obj==thesis_id[6]:
-                    strField=strField.replace(')','')
-                    chunks=strField.split('(')
-                    count=len(chunks)
-                    if count==2: 
-                        json_thesis['type_of_thesis']=chunks[0]
-                        json_thesis['subject']=chunks[1]
+                        if count==2: 
+                            json_thesis['type_of_thesis']=chunks[0]
+                            json_thesis['subject']=chunks[1]
                         
-                    if count==3:
-                        json_thesis['jurisprudence_type']=chunks[0]
-                        json_thesis['type_of_thesis']=chunks[1]
-                        json_thesis['subject']=chunks[2] 
+                        if count==3:
+                            json_thesis['jurisprudence_type']=chunks[0]
+                            json_thesis['type_of_thesis']=chunks[1]
+                            json_thesis['subject']=chunks[2] 
 
-                if obj==thesis_id[7]:
-                    json_thesis['heading']=strField.replace("'",',')
-                if obj==thesis_id[8]:
-                    json_thesis['text_content']=strField.replace("'",',') 
-                if obj==thesis_id[9]:  
-                    children=thesis_html.find_all(id=obj)
-                    for child in children:
-                        for p in precedentes_list:   
-                            preced=child.find_all(class_=p)
-                            for ele in preced:
-                                if ele.text!='':
-                                    strValue=ele.text.strip()
-                                    json_thesis['lst_precedents'].append(strValue.replace("'",','))
+                    if obj==thesis_id[7]:
+                        json_thesis['heading']=strField.replace("'",',')
+                    if obj==thesis_id[8]:
+                        json_thesis['text_content']=strField.replace("'",',') 
+                    if obj==thesis_id[9]:  
+                        children=thesis_html.find_all(id=obj)
+                        for child in children:
+                            for p in precedentes_list:   
+                                preced=child.find_all(class_=p)
+                                for ele in preced:
+                                    if ele.text!='':
+                                        strValue=ele.text.strip()
+                                        json_thesis['lst_precedents'].append(strValue.replace("'",','))
 
                 
-        for obj in thesis_class:
-            field=thesis_html.find(class_=obj)
-            if field.text != '':   
-                strField=field.text.strip()
-                if obj==thesis_class[0]:
-                    json_thesis['publication']=strField
+            for obj in thesis_class:
+                field=thesis_html.find(class_=obj)
+                if field.text != '':   
+                    strField=field.text.strip()
+                    if obj==thesis_class[0]:
+                        json_thesis['publication']=strField
    
         thesis_html=''
         result=json_thesis
@@ -294,11 +327,79 @@ def uploadThesis(id_thesis,json_thesis):
         
     return  result
 
+
+def getCompleteDate(pub_date):
+    pub_date=pub_date.strip()
+    if pub_date!='':
+        if pub_date.find(' ')!=-1:
+            # Day month year and hour
+            chunks=pub_date.split(' ')
+            #day=str(chunks[1].strip())
+            month=str(chunks[0].strip())
+            year=str(chunks[2].strip()) 
+        if pub_date.find(':')!=-1:
+            chunks=pub_date.split(':')
+            date_chunk=str(chunks[1].strip())
+            data=date_chunk.split(' ')
+            month=str(data[3].strip())
+            day=str(data[1].strip())
+            year=str(data[5].strip())
+        month_lower=month.lower()
+        for item in ls_months:
+            if month_lower==item:
+                month=str(ls_months.index(item)+1)
+                if len(month)==1:
+                    month='0'+month
+                    break
+                
+    completeDate=year+'-'+month+'-'+'01'                   
+    return completeDate
+
 """
 Objecst to connect to DB
 'mc' prefix to know the variables from MongoConnection class
 
 """
+
+def getIDLimit(sense,l_bot,l_top,period):
+    if period==9:
+        strperiod='Novena Época'
+    if period==10:
+        strperiod='Décima Época'
+    
+    #Onwars for    
+    if(sense==1):
+        for x in range(l_bot,l_top):
+            res=searchInUrl(x,strperiod)
+            if res==1:
+                break
+                
+    #Backwards For             
+    if(sense==2):
+        for x in range(l_top,l_bot,-1): 
+            res=searchInUrl(x,strperiod)
+            if res==1:
+                break
+            
+def searchInUrl(x,strperiod):
+    strIdThesis=str(x) 
+    url="https://sjf.scjn.gob.mx/SJFSist/Paginas/DetalleGeneralV2.aspx?ID="+strIdThesis+"&Clase=DetalleTesisBL&Semanario=0"
+    response= requests.get(url)
+    status= response.status_code
+    if status==200:
+        browser.get(url)
+        time.sleep(1)
+        thesis_html = BeautifulSoup(browser.page_source, 'lxml')
+        title=thesis_html.find('title')
+        title_text=title.text
+        if title_text.strip() != msg_error:
+            thesis_period=thesis_html.find(id='lblEpoca')
+            data=thesis_period.text
+            if data!='':
+                if strperiod==data.strip():
+                    print('ID for ',strperiod,' found in :',strIdThesis)
+                    return 1
+                    
 
     
 class CassandraConnection():
