@@ -119,8 +119,7 @@ def cassandraBDProcess(op,json_thesis,period_num):
     auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
     cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
     
-    session = cluster.connect()
-    session.default_timeout=15
+    
     
     
     if period_num==9:
@@ -138,6 +137,7 @@ def cassandraBDProcess(op,json_thesis,period_num):
     
     
         if period==strperiod.lower():
+
             
             row=''
             idThesis=json_thesis['id_thesis']
@@ -151,19 +151,20 @@ def cassandraBDProcess(op,json_thesis,period_num):
         
             if row: 
                 thesis_added=False
+                cluster.shutdown()
             else:
                 #Insert Data as JSON
                 json_thesis=json.dumps(json_thesis)
-                #wf.appendInfoToFile(dirquarttest,str(idThesis)+'.json', json_thesis)
-                
-                   
+                #wf.appendInfoToFile(dirquarttest,str(idThesis)+'.json', json_thesis)                
                 insertSt="INSERT INTO thesis.tbthesis JSON '"+json_thesis+"';"        
-                future = session.execute_async(insertSt)
-                future.result() 
-
+                executeNonQuery(insertSt) 
                 thesis_added=True
+                
     
     if op==3:
+
+        session = cluster.connect()
+        session.default_timeout=70
         
         row=''
         print('Counting rows from main table tbthesis...')
@@ -175,10 +176,14 @@ def cassandraBDProcess(op,json_thesis,period_num):
         for row in session.execute(statement):
             count=count+1
         
-        print('Count',str(count))    
+        print('Count',str(count))   
+        cluster.shutdown() 
             
     
     if op==4:
+
+        session = cluster.connect()
+        session.default_timeout=70
         
         row=''
         count=0
@@ -192,9 +197,13 @@ def cassandraBDProcess(op,json_thesis,period_num):
                 count=count+1
                 session.execute(deleteSt)
                 
-        print('Deleted:',str(count))        
+        print('Deleted:',str(count))  
+        cluster.shutdown()      
                 
     if op==5:
+
+        session = cluster.connect()
+        session.default_timeout=70
         print('Updating started...')
         querySt="select id_thesis from thesis.tbthesis where period='Décima Época'"
         future = session.execute_async(querySt)
@@ -211,14 +220,33 @@ def cassandraBDProcess(op,json_thesis,period_num):
                 count=count+1
             
                             
-        print('Total of thesis updated:',count)            
-            
-    
-
-    cluster.shutdown()
-              
+        print('Total of thesis updated:',count)  
+        cluster.shutdown()          
+                         
     return thesis_added
- 
+
+def executeNonQuery(strStatement):
+    #Connect to Cassandra
+    objCC=CassandraConnection()
+    cloud_config= {
+        'secure_connect_bundle': pathToHere+'secure-connect-dbquart.zip'
+    }
+    
+    auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
+    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
+    
+    session = cluster.connect()
+    session.default_timeout=70
+    
+    auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
+    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
+    
+    future = session.execute_async(strStatement)
+    future.result()
+    
+    cluster.shutdown()
+    
+     
 
 """
 prepareThesis:
