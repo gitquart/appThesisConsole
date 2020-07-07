@@ -23,8 +23,6 @@ from selenium import webdriver
 import chromedriver_autoinstaller
 from bs4 import BeautifulSoup
 import time
-#from pymongo import MongoClient
-#import bson
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
 #import writeFile as wf
@@ -76,6 +74,7 @@ def readUrl(sense,l_bot,l_top,period):
     #Onwars for    
     if(sense==1):
         for x in range(l_bot,l_top):
+            print('Current thesis:',str(x))
             res=prepareThesis(x,json_thesis,period)
             #wf.appendInfoToFile(pathToHere+'tests/',str(x)+'.json',json.dumps(json_thesis))
             if(res!=''):
@@ -89,6 +88,7 @@ def readUrl(sense,l_bot,l_top,period):
     #Backwards For             
     if(sense==2):
         for x in range(l_top,l_bot,-1): 
+            print('Current thesis:',str(x))
             res=prepareThesis(x,json_thesis,period)
             #wf.appendInfoToFile(pathToHere+'tests/',str(x)+'.json',json.dumps(json_thesis))
             if(res!=''):
@@ -117,11 +117,9 @@ def cassandraBDProcess(op,json_thesis,period_num):
     }
     
     auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
-    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
     
     
-    
-    
+        
     if period_num==9:
         strperiod='Novena Época'
     if period_num==10:
@@ -132,37 +130,41 @@ def cassandraBDProcess(op,json_thesis,period_num):
         
         #Get values for query
         #Ejemplo : Décima Época
+        thesis_added=False
         period=json_thesis['period']
         period=period.lower()
     
-    
-        if period==strperiod.lower():
-
-            
-            row=''
-            idThesis=json_thesis['id_thesis']
-            heading=json_thesis['heading']
-            #Check wheter or not the record exists
+        cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
+        session = cluster.connect()
+        session.default_timeout=70
+        row=''
+        idThesis=json_thesis['id_thesis']
+        heading=json_thesis['heading']
+        #Check wheter or not the record exists
            
-            querySt="select * from thesis.tbthesis where id_thesis="+str(idThesis)+" and heading='"+heading+"'"
+        querySt="select id_thesis from thesis.tbthesis where id_thesis="+str(idThesis)+" and heading='"+heading+"'"
                 
-            future = session.execute_async(querySt)
-            row=future.result()
+        future = session.execute_async(querySt)
+        row=future.result()
         
-            if row: 
-                thesis_added=False
-                cluster.shutdown()
-            else:
-                #Insert Data as JSON
-                json_thesis=json.dumps(json_thesis)
-                #wf.appendInfoToFile(dirquarttest,str(idThesis)+'.json', json_thesis)                
-                insertSt="INSERT INTO thesis.tbthesis JSON '"+json_thesis+"';"        
-                executeNonQuery(insertSt) 
-                thesis_added=True
+        if row: 
+            thesis_added=False
+            cluster.shutdown()
+        else:
                 
-    
+            #Insert Data as JSON
+            json_thesis=json.dumps(json_thesis)
+            #wf.appendInfoToFile(dirquarttest,str(idThesis)+'.json', json_thesis)                
+            insertSt="INSERT INTO thesis.tbthesis JSON '"+json_thesis+"';" 
+            future = session.execute_async(insertSt)
+            future.result()  
+            thesis_added=True
+            cluster.shutdown()     
+                
+                
     if op==3:
 
+        cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
         session = cluster.connect()
         session.default_timeout=70
         
@@ -182,6 +184,7 @@ def cassandraBDProcess(op,json_thesis,period_num):
     
     if op==4:
 
+        cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
         session = cluster.connect()
         session.default_timeout=70
         
@@ -225,27 +228,7 @@ def cassandraBDProcess(op,json_thesis,period_num):
                          
     return thesis_added
 
-def executeNonQuery(strStatement):
-    #Connect to Cassandra
-    objCC=CassandraConnection()
-    cloud_config= {
-        'secure_connect_bundle': pathToHere+'secure-connect-dbquart.zip'
-    }
-    
-    auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
-    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
-    
-    session = cluster.connect()
-    session.default_timeout=70
-    
-    auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
-    cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
-    
-    future = session.execute_async(strStatement)
-    future.result()
-    
-    cluster.shutdown()
-    
+
      
 
 """
@@ -260,6 +243,8 @@ def prepareThesis(id_thesis,json_thesis,period):
     if period==10:
         strperiod='Décima Época'
         
+      
+        
     result=''
     strIdThesis=str(id_thesis) 
     url="https://sjf.scjn.gob.mx/SJFSist/Paginas/DetalleGeneralV2.aspx?ID="+strIdThesis+"&Clase=DetalleTesisBL&Semanario=0"
@@ -272,9 +257,26 @@ def prepareThesis(id_thesis,json_thesis,period):
         title=thesis_html.find('title')
         title_text=title.text
         if title_text.strip() != msg_error:  
-            json_thesis['id_thesis']=int(strIdThesis)
+            #Clear Json  
+            json_thesis['id_thesis']=''
             json_thesis['lst_precedents'].clear()
-            #json_thesis['_id']=t =bson.objectid.ObjectId()
+            json_thesis['thesis_number']=''
+            json_thesis['instance']=''
+            json_thesis['source']=''
+            json_thesis['book_number']=''  
+            json_thesis['publication_date']='' 
+            json_thesis['dt_publication_date']=''
+            json_thesis['period']=''
+            json_thesis['page']=''
+            json_thesis['jurisprudence_type']=''
+            json_thesis['type_of_thesis']=''
+            json_thesis['subject']=''
+            json_thesis['heading']=''
+            json_thesis['text_content']=''
+            json_thesis['publication']=''
+            
+            
+            json_thesis['id_thesis']=int(strIdThesis)
             #Fet values from header, and body of thesis
             for obj in thesis_id:  
                 field=thesis_html.find(id=obj)
@@ -288,26 +290,29 @@ def prepareThesis(id_thesis,json_thesis,period):
                         json_thesis['source']=strField
                     #Special Case    
                     if obj==thesis_id[3]:
-                        if strField.find(',')!=-1:
-                            chunks=strField.split(',')
-                            count=len(chunks)
-                            if count==2:
-                                json_thesis['book_number']=chunks[0]
-                            if count==3:
-                                json_thesis['book_number']=chunks[0]+" "+chunks[2]
-                            json_thesis['publication_date']=chunks[1]            
+                        if strField=='.':
+                            json_thesis['book_number']=''  
+                            json_thesis['publication_date']='' 
+                            json_thesis['dt_publication_date']='1000-01-01'
                         else:
-                            json_thesis['publication_date']=strField
-                        epoc=thesis_html.find(id='lblEpoca')
-                        strEpoc=epoc.text
-                        if strEpoc==strperiod:
-                            json_thesis['dt_publication_date']=getCompleteDate(json_thesis['publication_date'])
+                            json_thesis['book_number']=strField  
+                            json_thesis['publication_date']='' 
+                            json_thesis['dt_publication_date']='1000-01-01' 
+                                                
                     if obj==thesis_id[4]:
                         json_thesis['period']=strField
+                        if strField=='Quinta Época':
+                            json_thesis['period_number']=5
+                        if strField=='Sexta Época':
+                            json_thesis['period_number']=6
+                        if strField=='Séptima Época':
+                            json_thesis['period_number']=7
+                        if strField=='Octava Época':
+                            json_thesis['period_number']=8        
                         if strField=='Novena Época':
                             json_thesis['period_number']=9
                         if strField=='Décima Época':
-                            json_thesis['period_number']=10    
+                            json_thesis['period_number']=10       
                     if obj==thesis_id[5]:
                         json_thesis['page']=strField
                     #Special case :
@@ -349,6 +354,11 @@ def prepareThesis(id_thesis,json_thesis,period):
    
         thesis_html=''
         result=json_thesis
+        
+        if title_text.strip() == msg_error:
+            result=''
+            
+            
     else:
         print('Custom error ID:',strIdThesis)
         result=''
@@ -365,7 +375,7 @@ def getCompleteDate(pub_date):
             #day=str(chunks[1].strip())
             month=str(chunks[0].strip())
             year=str(chunks[2].strip()) 
-        if pub_date.find(':')!=-1:
+        elif pub_date.find(':')!=-1:
             chunks=pub_date.split(':')
             date_chunk=str(chunks[1].strip())
             data=date_chunk.split(' ')
@@ -390,11 +400,15 @@ Objecst to connect to DB
 """
 
 def getIDLimit(sense,l_bot,l_top,period):
+    
+    """
     if period==9:
         strperiod='Novena Época'
     if period==10:
         strperiod='Décima Época'
-    
+    """   
+    if period==0:
+        strperiod='None'
     #Onwars for    
     if(sense==1):
         for x in range(l_bot,l_top):
@@ -415,6 +429,7 @@ def searchInUrl(x,strperiod):
     response= requests.get(url)
     status= response.status_code
     if status==200:
+        print('ID:',str(x))
         browser.get(url)
         time.sleep(1)
         thesis_html = BeautifulSoup(browser.page_source, 'lxml')
@@ -424,7 +439,7 @@ def searchInUrl(x,strperiod):
             thesis_period=thesis_html.find(id='lblEpoca')
             data=thesis_period.text
             if data!='':
-                if strperiod==data.strip():
+                if data.strip()!='Décima Época' and data.strip()!='Novena Época':
                     print('ID for ',strperiod,' found in :',strIdThesis)
                     return 1
                     
