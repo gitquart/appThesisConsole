@@ -32,7 +32,7 @@ from cassandra.query import SimpleStatement
 #Global variables
 
 
-pathToHere='/Users/ulysesrico/RespaldoMacUly/quart/appsQuart/appConsoleThesis/'
+pathToHere='/Users/ulysesrico/RespaldoMacUly/quart/appsQuart/appThesisConsole/'
 dirquarttest=pathToHere+'filetest/'
 msg_error="Custom Error"
 thesis_id=[ 'lblTesisBD','lblInstancia','lblFuente','lblLocMesAño','lblEpoca','lblLocPagina','lblTJ','lblRubro','lblTexto','lblPrecedentes']
