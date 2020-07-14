@@ -32,8 +32,9 @@ from cassandra.query import SimpleStatement
 #Global variables
 
 
-pathToHere='/Users/ulysesrico/RespaldoMacUly/quart/appsQuart/appThesisConsole/'
-dirquarttest=pathToHere+'filetest/'
+pathToHereMac='/Users/ulysesrico/RespaldoMacUly/quart/appsQuart/appThesisConsole/'
+pathToHereWin='C:\\Users\\Acer\\Documents\\quart\\appsquart\\appThesisConsole\\'
+dirquarttestMac=pathToHereMac+'filetest/'
 msg_error="Custom Error"
 thesis_id=[ 'lblTesisBD','lblInstancia','lblFuente','lblLocMesAño','lblEpoca','lblLocPagina','lblTJ','lblRubro','lblTexto','lblPrecedentes']
 thesis_class=['publicacion']
@@ -113,7 +114,7 @@ def cassandraBDProcess(op,json_thesis,period_num):
     #Connect to Cassandra
     objCC=CassandraConnection()
     cloud_config= {
-        'secure_connect_bundle': pathToHere+'secure-connect-dbquart.zip'
+        'secure_connect_bundle': pathToHereWin+'secure-connect-dbquart.zip'
     }
     
     auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
@@ -162,7 +163,7 @@ def cassandraBDProcess(op,json_thesis,period_num):
             cluster.shutdown()     
                 
                 
-    if op==3:
+    if op==2:
 
         cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
         session = cluster.connect()
@@ -182,7 +183,7 @@ def cassandraBDProcess(op,json_thesis,period_num):
         cluster.shutdown() 
             
     
-    if op==4:
+    if op==3:
 
         cluster = Cluster(cloud=cloud_config, auth_provider=auth_provider)
         session = cluster.connect()
@@ -203,7 +204,7 @@ def cassandraBDProcess(op,json_thesis,period_num):
         print('Deleted:',str(count))  
         cluster.shutdown()      
                 
-    if op==5:
+    if op==4:
 
         session = cluster.connect()
         session.default_timeout=70
