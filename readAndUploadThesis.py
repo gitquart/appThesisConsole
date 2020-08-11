@@ -28,12 +28,13 @@ from cassandra.auth import PlainTextAuthProvider
 #import writeFile as wf
 import requests 
 from cassandra.query import SimpleStatement
+import os
 
 #Global variables
 
 
 pathToHereMac='/Users/ulysesrico/RespaldoMacUly/quart/appsQuart/appThesisConsole/'
-pathToHereWin='C:\\Users\\Acer\\Documents\\quart\\appsquart\\appThesisConsole\\'
+pathToHereWin=os.getcwd()
 dirquarttestMac=pathToHereMac+'filetest/'
 msg_error="Custom Error"
 thesis_id=[ 'lblTesisBD','lblInstancia','lblFuente','lblLocMesAño','lblEpoca','lblLocPagina','lblTJ','lblRubro','lblTexto','lblPrecedentes']
@@ -114,7 +115,7 @@ def cassandraBDProcess(op,json_thesis,period_num):
     #Connect to Cassandra
     objCC=CassandraConnection()
     cloud_config= {
-        'secure_connect_bundle': pathToHereWin+'secure-connect-dbquart.zip'
+        'secure_connect_bundle': pathToHereWin+'\\secure-connect-dbquart.zip'
     }
     
     auth_provider = PlainTextAuthProvider(objCC.cc_user,objCC.cc_pwd)
@@ -170,9 +171,9 @@ def cassandraBDProcess(op,json_thesis,period_num):
         session.default_timeout=70
         
         row=''
-        print('Counting rows from main table tbthesis...')
+        print('Test python vs scala')
        
-        querySt="select id_thesis from thesis.tbthesis where period_number="+str(period_num)+" "   
+        querySt="select * from thesis.tbthesis where period_number>"+str(period_num)+" ALLOW FILTERING "   
         
         count=0
         statement = SimpleStatement(querySt, fetch_size=1000)
